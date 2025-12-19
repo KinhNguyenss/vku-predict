@@ -1,0 +1,63 @@
+{% extends "layout.html" %}
+{% block content %}
+    <div class="container py-4">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="main-card text-center d-flex flex-column justify-content-center align-items-center">
+                    {% if has_data %}
+                        <div class="mb-4">
+                            <div class="badge bg-light text-primary px-3 py-2 rounded-pill mb-3">Kết quả dự đoán 2026</div>
+                            <h2 class="fw-bold mb-1">{{ ten_nganh }}</h2>
+                            <p class="text-muted">Dựa trên dữ liệu học máy từ 2018-2025</p>
+                        </div>
+                        <div class="row w-100 justify-content-center mb-5">
+                            <div class="col-md-5 mb-3">
+                                <div class="p-4 border rounded-4 bg-light">
+                                    <small class="text-muted text-uppercase fw-bold">Điểm của bạn</small>
+                                    <div class="display-4 fw-bold text-dark mt-2">{{ tong_diem }}</div>
+                                </div>
+                            </div>
+                            <div class="col-md-5 mb-3">
+                                <div class="p-4 border rounded-4 bg-light">
+                                    <small class="text-muted text-uppercase fw-bold">Điểm chuẩn AI</small>
+                                    <div class="display-4 fw-bold text-primary mt-2">{{ diem_chuan }}</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-4">
+                            <h5 class="text-muted mb-3">Tỷ lệ trúng tuyển</h5>
+                            <div class="display-1 fw-bold" style="color: {{ color_code }}">{{ ty_le }}%</div>
+                            <p class="mt-2 fs-5 badge px-4 py-2" style="background-color: {{ color_code }}; color: white;">{{ loi_khuyen }}</p>
+                        </div>
+                        <a href="/" class="btn btn-outline-dark px-5 py-2 rounded-pill">
+                            <i class="fas fa-arrow-left me-2"></i>Dự đoán khác
+                        </a>
+                        <script>
+                            window.onload = function() {
+                                let history = JSON.parse(localStorage.getItem('vku_history')) || [];
+                                const newRecord = {
+                                    nganh: "{{ ten_nganh }}",
+                                    diem: "{{ tong_diem }}",
+                                    tyle: "{{ ty_le }}",
+                                    color: "{{ 'success' if ty_le > 80 else 'warning' if ty_le > 50 else 'danger' }}",
+                                    time: new Date().toLocaleTimeString()
+                                };
+                                if(history.length === 0 || history[0].time !== newRecord.time) {
+                                     history.unshift(newRecord);
+                                     if(history.length > 10) history.pop();
+                                     localStorage.setItem('vku_history', JSON.stringify(history));
+                                }
+                            };
+                        </script>
+                    {% else %}
+                        <div class="text-muted">
+                            <i class="fas fa-ghost fa-3x mb-3"></i>
+                            <p>Chưa có dữ liệu. Vui lòng nhập thông tin.</p>
+                            <a href="/" class="btn btn-primary-custom w-auto px-4">Đến trang nhập liệu</a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
