@@ -2,72 +2,111 @@ from flask import Flask, request, render_template, redirect, url_for, session
 import joblib
 import os
 import json
-import numpy as np
 
 app = Flask(__name__)
 app.secret_key = 'vku_mlops_secret_key'
 
-# --- CONFIG & DATA ---
+# --- 1. CONFIG DATA ---
 model_path = 'vku_model.pkl'
 model = None
 if os.path.exists(model_path):
     model = joblib.load(model_path)
 
-HISTORICAL_DATA = {
-    0: { "name": "Công nghệ thông tin", "years": [2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025], "scores": [17.0, 19.75, 18.0, 23.0, 25.0, 23.5, 24.0, 24.71] },
-    1: { "name": "Logistics & Chuỗi cung ứng", "years": [2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025], "scores": [16.0, 18.0, 18.0, 23.0, 25.0, 23.0, 26.0, 26.3] },
-    2: { "name": "Quản trị kinh doanh", "years": [2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025], "scores": [16.0, 18.75, 18.0, 22.5, 24.0, 23.0, 25.0, 25.65] }
+# Định nghĩa Khối xét tuyển và Môn thi
+BLOCKS = {
+    "A00": ["Toán", "Vật lí", "Hóa học"],
+    "A01": ["Toán", "Vật lí", "Tiếng Anh"],
+    "A03": ["Toán", "Vật lí", "Lịch sử"],
+    "B00": ["Toán", "Hóa học", "Sinh học"],
+    "B03": ["Toán", "Sinh học", "Ngữ văn"],
+    "B08": ["Toán", "Sinh học", "Tiếng Anh"],
+    "C00": ["Ngữ văn", "Lịch sử", "Địa lí"],
+    "C20": ["Ngữ văn", "Địa lí", "GDKTPL"],
+    "C04": ["Ngữ văn", "Toán", "Địa lí"],
+    "D01": ["Ngữ văn", "Toán", "Tiếng Anh"],
+    "D07": ["Toán", "Hóa học", "Tiếng Anh"],
+    "D84": ["Toán", "Tiếng Anh", "GDKTPL"]
 }
+
+# Dữ liệu hiển thị biểu đồ & Tên ngành (ID khớp với train_model.py)
+HISTORICAL_DATA = {
+    0: { "name": "Công nghệ thông tin (CNTT)", "scores": [23.0, 25.0, 25.01, 25.0, 20.0] },
+    1: { "name": "Trí tuệ nhân tạo (AI)", "scores": [21.05, 25.0, 25.01, 25.0, 21.0] },
+    2: { "name": "An toàn thông tin", "scores": [22.0, 24.5, 23.0, 24.0, 19.0] },
+    3: { "name": "Công nghệ kỹ thuật máy tính / Vi mạch", "scores": [20.0, 24.0, 23.0, 27.0, 24.0] },
+    4: { "name": "Marketing", "scores": [22.0, 25.0, 23.0, 26.0, 23.25] },
+    5: { "name": "Logistics & Chuỗi cung ứng số", "scores": [23.0, 25.0, 23.0, 26.0, 23.5] },
+    6: { "name": "Quản trị kinh doanh (QTKD)", "scores": [22.5, 24.0, 23.0, 25.0, 22.0] },
+    7: { "name": "Du lịch & Lữ hành số", "scores": [20.5, 24.0, 22.5, 25.0, 23.0] },
+    8: { "name": "Công nghệ tài chính", "scores": [21.0, 24.0, 22.5, 24.0, 22.0] }
+}
+YEARS = [2021, 2022, 2023, 2024, 2025]
 MAJORS = {k: v["name"] for k, v in HISTORICAL_DATA.items()}
 
 # --- ROUTES ---
 
 @app.route('/')
 def index():
-    # Sử dụng render_template thay vì render_template_string
-    return render_template('index.html', page='home', majors=MAJORS)
+    return render_template('index.html', page='home', majors=MAJORS, blocks=BLOCKS)
 
 @app.route('/process', methods=['POST'])
 def process():
     try:
+        # Lấy dữ liệu từ Form
         major_id = int(request.form['major_id'])
-        toan = float(request.form['toan'])
-        ly = float(request.form['ly'])
-        hoa = float(request.form['hoa'])
-        tong_diem = toan + ly + hoa
+        block_id = request.form['block_id']
         
+        # Lấy điểm 3 môn
+        s1 = float(request.form['score1'])
+        s2 = float(request.form['score2'])
+        s3 = float(request.form['score3'])
+        
+        # Tính tổng điểm
+        tong_diem = s1 + s2 + s3
+        
+        # Dự đoán điểm chuẩn 2026
         du_doan = 0
         if model:
-            # Model LinearRegression yêu cầu input 2 chiều
             du_doan = model.predict([[2026, major_id]])[0]
             
         session['result'] = {
             'major_id': major_id,
+            'block_id': block_id,
             'tong_diem': round(tong_diem, 2),
             'diem_chuan': round(du_doan, 2)
         }
         return redirect(url_for('result'))
     except Exception as e:
-        return f"Lỗi: {str(e)}"
+        return f"Lỗi nhập liệu: {str(e)}"
 
 @app.route('/result')
 def result():
     data = session.get('result')
-    if not data:
-        return render_template('result.html', page='result', has_data=False)
+    
+    # --- PHẦN SỬA LỖI QUAN TRỌNG ---
+    # Nếu không có dữ liệu HOẶC dữ liệu cũ thiếu 'block_id'
+    # -> Tự động quay về trang chủ để nhập lại
+    if not data or 'block_id' not in data:
+        return redirect(url_for('index'))
+    # -------------------------------
     
     chenh_lech = data['tong_diem'] - data['diem_chuan']
-    if chenh_lech >= 1.5:
-        ty_le, msg, color = 99, "CỰC KỲ AN TOÀN", "#059669"
-    elif chenh_lech >= 0:
-        ty_le, msg, color = 85 + int(chenh_lech*5), "KHẢ QUAN", "#10B981"
-    elif chenh_lech >= -1.0:
-        ty_le, msg, color = 50 + int(chenh_lech*30), "CẦN CÂN NHẮC", "#F59E0B"
+    
+    # Logic tư vấn
+    if chenh_lech >= 2.0:
+        ty_le, msg, color = 99, "CHÚC MỪNG! BẠN RẤT AN TOÀN", "#059669"
+    elif chenh_lech >= 0.5:
+        ty_le, msg, color = 90, "CƠ HỘI TRÚNG TUYỂN CAO", "#10B981"
+    elif chenh_lech >= -0.5:
+        ty_le, msg, color = 60, "CẠNH TRANH GAY GẮT", "#F59E0B"
+    elif chenh_lech >= -2.0:
+        ty_le, msg, color = 30, "CẦN CỐ GẮNG NHIỀU HƠN", "#EF4444"
     else:
-        ty_le, msg, color = max(5, 50 + int(chenh_lech*20)), "RỦI RO CAO", "#EF4444"
+        ty_le, msg, color = 10, "HÃY CHỌN NGUYỆN VỌNG KHÁC", "#991B1B"
         
     return render_template('result.html', page='result', has_data=True, 
                            ten_nganh=MAJORS.get(data['major_id']),
+                           khoi_xet=data['block_id'], # Dòng này sẽ không còn lỗi nữa
                            tong_diem=data['tong_diem'],
                            diem_chuan=data['diem_chuan'],
                            ty_le=int(ty_le),
@@ -76,9 +115,24 @@ def result():
 
 @app.route('/analytics')
 def analytics():
+    chart_data = {
+        "labels": YEARS,
+        "datasets": []
+    }
+    
+    colors = ['#4F46E5', '#EC4899', '#F59E0B', '#10B981', '#3B82F6', '#6366F1', '#8B5CF6', '#EC4899', '#14B8A6']
+    
+    for idx, (mid, mdata) in enumerate(HISTORICAL_DATA.items()):
+        chart_data["datasets"].append({
+            "label": mdata["name"],
+            "data": mdata["scores"],
+            "borderColor": colors[idx % len(colors)],
+            "fill": False,
+            "tension": 0.4
+        })
+
     return render_template('analytics.html', page='analytics', 
-                           data=HISTORICAL_DATA, 
-                           chart_json=json.dumps(HISTORICAL_DATA))
+                           chart_json=json.dumps(chart_data))
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
