@@ -1,77 +1,118 @@
 {% extends "layout.html" %}
 {% block content %}
-    <div class="container py-4">
-        <div class="row justify-content-center">
-            <div class="col-lg-10">
-                <div class="main-card p-0 overflow-hidden">
-                    <div class="row g-0 h-100">
-                        <div class="col-md-8 p-4 p-md-5">
-                            <h4 class="mb-2 fw-bold text-dark">AI Prediction Engine</h4>
-                            <p class="text-muted mb-4 small">Nhập thông tin điểm số để AI phân tích khả năng trúng tuyển.</p>
-                            <form method="post" action="/process">
-                                <div class="mb-4">
-                                    <label class="form-label fw-bold">Chọn Chuyên Ngành</label>
-                                    <select name="major_id" class="form-select bg-light border-0 py-3">
-                                        {% for id, name in majors.items() %}
-                                            <option value="{{ id }}">{{ name }}</option>
-                                        {% endfor %}
-                                    </select>
-                                </div>
-                                <div class="row g-3 mb-4">
-                                    <div class="col-md-4">
-                                        <label class="form-label small text-muted">TOÁN</label>
-                                        <input type="number" step="0.1" name="toan" class="form-control bg-light border-0 py-3" placeholder="0.0" required>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label class="form-label small text-muted">LÝ</label>
-                                        <input type="number" step="0.1" name="ly" class="form-control bg-light border-0 py-3" placeholder="0.0" required>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label class="form-label small text-muted">HÓA/ANH</label>
-                                        <input type="number" step="0.1" name="hoa" class="form-control bg-light border-0 py-3" placeholder="0.0" required>
-                                    </div>
-                                </div>
-                                <button type="submit" class="btn btn-primary-custom mt-2">
-                                    <i class="fas fa-magic me-2"></i>Generate Prediction
-                                </button>
-                            </form>
-                        </div>
-                        <div class="col-md-4 history-sidebar">
-                            <div class="d-flex justify-content-between align-items-center mb-3">
-                                <h6 class="fw-bold mb-0"><i class="fas fa-history me-2"></i>Lịch sử</h6>
-                                <button onclick="clearHistory()" class="btn btn-sm text-danger p-0" style="font-size: 0.8rem;">Xóa</button>
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="main-card p-0 overflow-hidden">
+                <div class="row g-0 h-100">
+                    <div class="col-md-8 p-4 p-md-5">
+                        <h4 class="mb-2 fw-bold text-dark">VKU AI Prediction Engine</h4>
+                        <p class="text-muted mb-4 small">Hệ thống dự đoán trúng tuyển thông minh dựa trên dữ liệu 2021-2025.</p>
+                        
+                        <form method="post" action="/process">
+                            <div class="mb-4">
+                                <label class="form-label fw-bold"><i class="fas fa-graduation-cap me-2"></i>Chọn Chuyên Ngành</label>
+                                <select name="major_id" class="form-select bg-light border-0 py-3">
+                                    {% for id, name in majors.items() %}
+                                        <option value="{{ id }}">{{ name }}</option>
+                                    {% endfor %}
+                                </select>
                             </div>
-                            <div id="history-list" style="max-height: 450px; overflow-y: auto;"></div>
+
+                            <div class="mb-4">
+                                <label class="form-label fw-bold"><i class="fas fa-cubes me-2"></i>Chọn Khối Xét Tuyển</label>
+                                <select id="blockSelect" name="block_id" class="form-select bg-light border-0 py-3" onchange="updateSubjects()">
+                                    {% for bid, subjects in blocks.items() %}
+                                        <option value="{{ bid }}" data-subjects='{{ subjects|tojson }}'>
+                                            Khối {{ bid }} ({{ subjects|join(', ') }})
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <label class="form-label fw-bold mb-3"><i class="fas fa-pen-alt me-2"></i>Nhập Điểm Thi (0-10)</label>
+                            <div class="row g-3 mb-4">
+                                <div class="col-md-4">
+                                    <div class="form-floating">
+                                        <input type="number" step="0.1" min="0" max="10" name="score1" class="form-control bg-light border-0" id="inputS1" placeholder="0" required>
+                                        <label id="labelS1">Môn 1</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-floating">
+                                        <input type="number" step="0.1" min="0" max="10" name="score2" class="form-control bg-light border-0" id="inputS2" placeholder="0" required>
+                                        <label id="labelS2">Môn 2</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-floating">
+                                        <input type="number" step="0.1" min="0" max="10" name="score3" class="form-control bg-light border-0" id="inputS3" placeholder="0" required>
+                                        <label id="labelS3">Môn 3</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary-custom mt-2">
+                                <i class="fas fa-magic me-2"></i>DỰ ĐOÁN NGAY
+                            </button>
+                        </form>
+                    </div>
+
+                    <div class="col-md-4 history-sidebar">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="fw-bold mb-0"><i class="fas fa-history me-2"></i>Lịch sử</h6>
+                            <button onclick="clearHistory()" class="btn btn-sm text-danger p-0" style="font-size: 0.8rem;">Xóa</button>
                         </div>
+                        <div id="history-list" style="max-height: 450px; overflow-y: auto;"></div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-    <script>
-        function renderHistory() {
-            let history = JSON.parse(localStorage.getItem('vku_history')) || [];
-            const container = document.getElementById('history-list');
-            if (history.length === 0) {
-                container.innerHTML = '<div class="text-center text-muted mt-5 small">Chưa có dữ liệu</div>';
-                return;
-            }
-            let html = '';
-            history.forEach(item => {
-                html += `
-                    <div class="history-item shadow-sm">
-                        <div class="fw-bold text-primary" style="font-size: 0.8rem">${item.nganh}</div>
-                        <div class="d-flex justify-content-between mt-1">
-                            <span class="small text-muted">Điểm: ${item.diem}</span>
-                            <span class="badge bg-${item.color}">${item.tyle}%</span>
-                        </div>
-                        <div class="text-end text-muted" style="font-size: 0.65rem; margin-top:4px;">${item.time}</div>
-                    </div>`;
-            });
-            container.innerHTML = html;
-        }
-        function clearHistory() { localStorage.removeItem('vku_history'); renderHistory(); }
-        renderHistory();
-    </script>
-{% endblock %}
+</div>
 
+<script>
+    // Hàm cập nhật tên môn học dựa vào Khối đã chọn
+    function updateSubjects() {
+        const select = document.getElementById('blockSelect');
+        const selectedOption = select.options[select.selectedIndex];
+        const subjects = JSON.parse(selectedOption.getAttribute('data-subjects'));
+
+        document.getElementById('labelS1').innerText = subjects[0];
+        document.getElementById('labelS2').innerText = subjects[1];
+        document.getElementById('labelS3').innerText = subjects[2];
+    }
+
+    // Chạy ngay khi load trang
+    window.onload = function() {
+        updateSubjects();
+        renderHistory();
+    };
+
+    // (Giữ nguyên phần logic History cũ)
+    function renderHistory() {
+        let history = JSON.parse(localStorage.getItem('vku_history')) || [];
+        const container = document.getElementById('history-list');
+        if (history.length === 0) {
+            container.innerHTML = '<div class="text-center text-muted mt-5 small">Chưa có dữ liệu</div>';
+            return;
+        }
+        let html = '';
+        history.forEach(item => {
+            html += `
+                <div class="history-item shadow-sm">
+                    <div class="fw-bold text-primary" style="font-size: 0.8rem">${item.nganh}</div>
+                    <div class="d-flex justify-content-between mt-1">
+                        <span class="badge bg-secondary" style="font-size: 0.7rem">${item.khoi}</span>
+                        <span class="small text-muted">Tổng: ${item.diem}</span>
+                    </div>
+                    <div class="mt-1">
+                        <span class="badge bg-${item.color} w-100">${item.tyle}%</span>
+                    </div>
+                </div>`;
+        });
+        container.innerHTML = html;
+    }
+    function clearHistory() { localStorage.removeItem('vku_history'); renderHistory(); }
+</script>
+{% endblock %}
