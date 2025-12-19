@@ -1,4 +1,4 @@
-from flask import Flask, request, render_template, redirect, url_for, session
+from flask import Flask, request, render_template, redirect, url_for, session, jsonify
 import joblib
 import os
 import json
@@ -28,7 +28,6 @@ BLOCKS = {
     "D84": ["Toán", "Tiếng Anh", "GDKTPL"]
 }
 
-# Dữ liệu hiển thị biểu đồ & Tên ngành (ID khớp với train_model.py)
 HISTORICAL_DATA = {
     0: { "name": "Công nghệ thông tin (CNTT)", "scores": [23.0, 25.0, 25.01, 25.0, 20.0] },
     1: { "name": "Trí tuệ nhân tạo (AI)", "scores": [21.05, 25.0, 25.01, 25.0, 21.0] },
@@ -49,22 +48,38 @@ MAJORS = {k: v["name"] for k, v in HISTORICAL_DATA.items()}
 def index():
     return render_template('index.html', page='home', majors=MAJORS, blocks=BLOCKS)
 
+# --- NEW: API HEALTH CHECK ---
+@app.route('/health', methods=['GET'])
+def health_check():
+    """
+    API kiểm tra trạng thái hệ thống.
+    Trả về JSON: { "status": "UP", "model_loaded": boolean }
+    """
+    try:
+        # Kiểm tra xem model có đang hoạt động không
+        is_model_ok = model is not None
+        
+        status_info = {
+            "status": "UP",
+            "service": "VKU AI Prediction System",
+            "model_loaded": is_model_ok
+        }
+        # Trả về code 200 OK
+        return jsonify(status_info), 200
+    except Exception as e:
+        # Nếu server lỗi, trả về code 500
+        return jsonify({"status": "DOWN", "error": str(e)}), 500
+
 @app.route('/process', methods=['POST'])
 def process():
     try:
-        # Lấy dữ liệu từ Form
         major_id = int(request.form['major_id'])
         block_id = request.form['block_id']
-        
-        # Lấy điểm 3 môn
         s1 = float(request.form['score1'])
         s2 = float(request.form['score2'])
         s3 = float(request.form['score3'])
-        
-        # Tính tổng điểm
         tong_diem = s1 + s2 + s3
         
-        # Dự đoán điểm chuẩn 2026
         du_doan = 0
         if model:
             du_doan = model.predict([[2026, major_id]])[0]
@@ -82,17 +97,11 @@ def process():
 @app.route('/result')
 def result():
     data = session.get('result')
-    
-    # --- PHẦN SỬA LỖI QUAN TRỌNG ---
-    # Nếu không có dữ liệu HOẶC dữ liệu cũ thiếu 'block_id'
-    # -> Tự động quay về trang chủ để nhập lại
     if not data or 'block_id' not in data:
         return redirect(url_for('index'))
-    # -------------------------------
     
     chenh_lech = data['tong_diem'] - data['diem_chuan']
     
-    # Logic tư vấn
     if chenh_lech >= 2.0:
         ty_le, msg, color = 99, "CHÚC MỪNG! BẠN RẤT AN TOÀN", "#059669"
     elif chenh_lech >= 0.5:
@@ -106,7 +115,7 @@ def result():
         
     return render_template('result.html', page='result', has_data=True, 
                            ten_nganh=MAJORS.get(data['major_id']),
-                           khoi_xet=data['block_id'], # Dòng này sẽ không còn lỗi nữa
+                           khoi_xet=data['block_id'],
                            tong_diem=data['tong_diem'],
                            diem_chuan=data['diem_chuan'],
                            ty_le=int(ty_le),
@@ -119,7 +128,6 @@ def analytics():
         "labels": YEARS,
         "datasets": []
     }
-    
     colors = ['#4F46E5', '#EC4899', '#F59E0B', '#10B981', '#3B82F6', '#6366F1', '#8B5CF6', '#EC4899', '#14B8A6']
     
     for idx, (mid, mdata) in enumerate(HISTORICAL_DATA.items()):
